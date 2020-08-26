@@ -16,7 +16,7 @@ Pod::Spec.new do |spec|
   #
 
   spec.name         = "LCLRU"
-  spec.version      = "0.0.1"
+  spec.version      = "0.0.2"
   spec.summary      = "fast LRU."
 
   # This description is used to generate tags and improve search results.
@@ -65,7 +65,7 @@ Pod::Spec.new do |spec|
   #
 
   # spec.platform     = :ios
-  spec.platform     = :ios, "9.0"
+  spec.platform     = :ios, "7.0"
 
   #  When using multiple platforms
   # spec.ios.deployment_target = "5.0"
