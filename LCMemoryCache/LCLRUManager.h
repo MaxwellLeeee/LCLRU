@@ -17,6 +17,8 @@ NS_ASSUME_NONNULL_BEGIN
 @property NSTimeInterval ageLimit;
 @property NSTimeInterval autoTrimInterval;
 @property (nonatomic, strong) NSMutableSet *reuseArr;
+@property (nonatomic, assign) BOOL removeAllDataWhenEnterBackGround;
+
 
 - (BOOL)containsObjectForKey:(id)key;
 - (nullable id)objectForKey:(id)key;

@@ -31,12 +31,13 @@
     CFDictionaryRemoveValue(_searchDic, (__bridge const void *)(key));
 }
 
-//如果node就是尾节点，因为是环形链表，直接改变headNode和trailNode的指向就可以了
+//缓存命中就直接移动到头节点
 -(void)bringNodeToHead:(LCLinkedListNode *)node
 {
     if(node == self.headNode){
         return;
     }
+    //如果node就是尾节点，因为是环形链表，直接改变headNode和trailNode的指向就可以了
     if (node == self.trailNode) {
         self.headNode = self.trailNode;
         self.trailNode = self.trailNode.prev;
@@ -61,18 +62,14 @@
     self.headNode = node;
 }
 
--(void)insertFirstNode:(LCLinkedListNode *)node
-{
-    node.prev = node;
-    node.next = node;
-    self.headNode = node;
-    self.trailNode = node;
-}
-
+//缓存未命中就插入到头节点
 -(void)insertNodeAtHead:(LCLinkedListNode *)node
 {
     if (self.totalCount == 0) { //空
-        [self insertFirstNode:node];
+        node.prev = node;
+        node.next = node;
+        self.headNode = node;
+        self.trailNode = node;
     }else{
         node.prev = self.headNode.prev;
         node.next = self.headNode;
@@ -85,6 +82,7 @@
     self.totalCount ++;
 }
 
+//不使用节点复用池需要移除尾节点
 -(LCLinkedListNode *)removeTrailNode
 {
     /*
@@ -94,17 +92,6 @@
      */
     if(self.totalCount == 0){
         return nil;
-    }
-    if (!self.trailNode.key) {
-        LCLinkedListNode *trail = self.trailNode;
-        _totalCount --;
-        _totalSize -= self.trailNode.size;
-        if (self.headNode != self.trailNode) {
-            self.trailNode = self.trailNode.prev;
-            self.trailNode.next = self.headNode;
-            self.headNode.prev = self.trailNode;
-        }
-        return trail;
     }
     LCLinkedListNode *trail = self.trailNode;
     CFDictionaryRemoveValue(_searchDic, (__bridge const void *)(self.trailNode.key));
@@ -118,9 +105,26 @@
     return trail;
 }
 
--(void)removeNode
+//不使用节点复用池需要移除节点
+-(void)removeNode:(LCLinkedListNode *)node
 {
-    
+    CFDictionaryRemoveValue(_searchDic, (__bridge  const void *)(node.key));
+    self.totalSize -= node.size;
+    self.totalCount --;
+    if(self.totalCount == 0){ //删完了
+        self.headNode = nil;
+        self.trailNode = nil;
+        return;
+    }else{
+        node.next.prev = node.prev;
+        node.prev.next = node.next;
+        if (self.headNode == node) {
+            self.headNode = node.next;
+        }
+        if (self.trailNode == node) {
+            self.trailNode = node.prev;
+        }
+    }
 }
 
 -(void)clearAllNodes

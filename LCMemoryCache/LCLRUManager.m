@@ -11,9 +11,9 @@
 #import "LCLinkedList.h"
 #import <pthread.h>
 #import <QuartzCore/QuartzCore.h>
+#import <UIKit/UIApplication.h>
 
-
-#define kUseReuseSet (1)
+#define kUseReuseSet (0)
 
 @implementation LCLRUManager{
     pthread_mutex_t _lock;
@@ -32,13 +32,26 @@
         _sizeLimit = NSUIntegerMax;
         _ageLimit = DBL_MAX;
         _autoTrimInterval = 5.0;
+        [self addObservers];
         [self tryToFindNeedDeleteMemory];
     }
     return self;
 }
 
+-(void)addObservers
+{
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(appDidReceiveMemoryWarningNotification)
+                                                 name:UIApplicationDidReceiveMemoryWarningNotification
+                                               object:nil];
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(appDidEnterBackgroundNotification)
+                                                 name:UIApplicationDidEnterBackgroundNotification
+                                               object:nil];
+}
 
 - (void)dealloc {
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
     [_lru clearAllNodes];
     pthread_mutex_destroy(&_lock);
 }
@@ -57,6 +70,7 @@
 -(void)doSearchAction
 {
     dispatch_async(_queue, ^{
+        //每次插入的时候会检查数量，所以只需要检查时间和大小
         [self checkAge];
         [self checkSize];
     });
@@ -195,9 +209,7 @@
     pthread_mutex_lock(&_lock);
     LCLinkedListNode *node = CFDictionaryGetValue(_lru->_searchDic, (__bridge const void *)(key));
     NSTimeInterval now = CACurrentMediaTime();
-    id needReleaseValue;
     if(node){ //找到了
-        needReleaseValue = object;
         _lru.totalSize -= node.size;
         _lru.totalSize += cost;
         node.size = cost;
@@ -208,9 +220,8 @@
         if(_lru.totalCount >= self.countLimit){ //受个数限制，链表已满
             _lru.totalSize -= _lru.trailNode.size;
             _lru.totalSize += cost;
-            [_lru removeFromSearchDicWithKey:_lru.trailNode.key];
             node = _lru.trailNode;
-            needReleaseValue = node.data;
+            [_lru removeFromSearchDicWithKey:_lru.trailNode.key];
             node.size = cost;
             node.updateTIme = now;
             node.key = key;
@@ -219,9 +230,8 @@
         }else if(_lru.totalSize >= self.sizeLimit){ //受大小限制，链表已满
             _lru.totalSize -= _lru.trailNode.size;
             _lru.totalSize += cost;
-            [_lru removeFromSearchDicWithKey:_lru.trailNode.key];
             node = _lru.trailNode;
-            needReleaseValue = node.data;
+            [_lru removeFromSearchDicWithKey:_lru.trailNode.key];
             node.size = cost;
             node.updateTIme = now;
             node.key = key;
@@ -236,9 +246,6 @@
             node.data = object;
             [_lru insertNodeAtHead:node];
         }
-    }
-    if (needReleaseValue) {
-        //TODO:
     }
     pthread_mutex_unlock(&_lock);
 }
@@ -281,7 +288,9 @@
 -(void)putIntoReuse:(LCLinkedListNode *)node
 {
     //不删除node，只释放内容
+    CFDictionaryRemoveValue(_lru->_searchDic, (__bridge const void *)node.key);
     node.data = nil;
+    node.key = nil;
     [self.reuseArr addObject:node];
 }
 
@@ -289,10 +298,28 @@
 {
     //不删除node，只释放内容
     for (LCLinkedListNode *node in nodeArr) {
+        CFDictionaryRemoveValue(_lru->_searchDic, (__bridge const void *)node.key);
         node.data = nil;
+        node.key = nil;
     }
     [self.reuseArr addObjectsFromArray:nodeArr];
 }
+
+#pragma mark - notifications
+
+-(void)appDidReceiveMemoryWarningNotification
+{
+    [self removeAllObjects];
+}
+
+-(void)appDidEnterBackgroundNotification
+{
+    if (self.removeAllDataWhenEnterBackGround) {
+        [self removeAllObjects];
+    }
+}
+
+#pragma mark - getters and setters
 
 -(NSMutableSet *)reuseArr
 {
